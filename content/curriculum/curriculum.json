@@ -1,0 +1,236 @@
+{
+  "tracks": [
+    { "slug": "backend", "title": "Módulo 1: Fundamentos de Backend y Flujo de Peticiones", "order_index": 0, "description": "Ciclo HTTP, validación, auth, capabilities, anti-IDOR y auditoría." },
+    { "slug": "databases", "title": "Módulo 2: Bases de Datos, Persistencia y Consistencia", "order_index": 1, "description": "Modelado, índices, transacciones, migraciones, caché y Redis." },
+    { "slug": "services", "title": "Módulo 3: Servicios, Arquitectura y Procesamiento Asíncrono", "order_index": 2, "description": "Capas, errores, resiliencia, colas/workers y testing backend." },
+    { "slug": "frontend", "title": "Módulo 4: Frontend Moderno y Experiencia de Usuario", "order_index": 3, "description": "Componentes, formularios, seguridad, rendimiento y accesibilidad." },
+    { "slug": "prod", "title": "Módulo 5: Producción, Contenedores e Infraestructura", "order_index": 4, "description": "Docker, CI/CD, HTTPS, monitoreo y proyecto integrador." }
+  ],
+  "lessons": [
+    {
+      "track_slug": "backend", "order_index": 0,
+      "title": "Ciclo de vida de una petición HTTP",
+      "summary": "De la red al controlador: middlewares, guards, servicio y respuesta.",
+      "theory_md": "## Concepto\nToda petición recorre: red → reverse proxy → router → middlewares (request-id, CORS, rate-limit) → guards (auth/autorización) → pipes (validación) → controlador → servicio → repositorio → respuesta DTO.\n\n## Puntos clave\n- El controlador es delgado: solo orquesta.\n- La lógica vive en servicios; el acceso a datos en repositorios.\n- Cada capa añade contexto (request-id) sin acoplar a las demás.\n- Un fallo en cualquier eslabón debe producir un código HTTP semántico, no un 500 genérico.",
+      "lab_prompt": "Levanta la API (`node apps/api/dist/main.js`), haz `POST /auth/login` y verifica en el log el `x-request-id` en respuesta. Traza el recorrido en `src/main.ts` → guards → controlador.",
+      "checklist_json": ["Explico el orden red→respuesta sin mirar apuntes", "Encuentro dónde se asigna x-request-id", "Hago login y veo 200 + access_token"],
+      "estimated_minutes": 30
+    },
+    {
+      "track_slug": "backend", "order_index": 1,
+      "title": "Validación de entrada y DTOs",
+      "summary": "Sanitización, esquemas estrictos y prevención de mass assignment.",
+      "theory_md": "## Concepto\nNunca confíes en el cliente. Todo body/params/query se valida con esquema estricto (`.strict()` en Zod): tipos, formatos, rangos, longitudes y rechazo de campos extra.\n\n## Anatomía del fallo\nEnviar `{\"status\":\"completed\",\"userId\":\"otro\",\"role\":\"admin\"}` no debe tener efecto: el esquema lo rechaza con 400. Sin `.strict()`, un ORM ingenuo podría persistir `userId` y escalar privilegios (mass assignment).",
+      "lab_prompt": "Con token de student, haz `PATCH /progress/:id` enviando `{\"status\":\"completed\",\"userId\":\"xxx\"}`. Confirma 400 con `unrecognized_keys`. Luego repite solo con `status` y confirma 200.",
+      "checklist_json": ["Reproduzco el 400 con campo extra", "El update legítimo devuelve 200", "Explico qué es mass assignment"],
+      "estimated_minutes": 35
+    },
+    {
+      "track_slug": "backend", "order_index": 2,
+      "title": "Autenticación moderna",
+      "summary": "Sesiones vs JWT, access/refresh, rotación y almacenamiento seguro.",
+      "theory_md": "## Concepto\nAccess token corto (15 min) + refresh token largo (7d) en cookie HttpOnly `Secure; SameSite=Lax`. El access vive en memoria del cliente, nunca en `localStorage` (XSS lo robaría).\n\n## Claves\n- Validar firma, expiración, emisor y cuenta activa en cada request (401 si falla).\n- Hidratar identidad + capabilities en `req.user`.\n- Logout limpia cookies; refresh rota el par.",
+      "lab_prompt": "Haz login, inspecciona cookies `access_token`/`refresh_token` (HttpOnly). Llama `GET /auth/me` con y sin `Authorization: Bearer`. Confirma 200 vs 401.",
+      "checklist_json": ["Veo cookies HttpOnly tras login", "GET /auth/me` con token da 200", "Sin token da 401"],
+      "estimated_minutes": 35
+    },
+    {
+      "track_slug": "backend", "order_index": 3,
+      "title": "Autorización avanzada",
+      "summary": "RBAC, ABAC y capabilities granulares en guards.",
+      "theory_md": "## Concepto\nAutenticación = quién eres. Autorización = qué puedes hacer. Capabilities granulares (`lessons:read`, `progress:write`, `audit:read`) superan al rol plano: un mentor puede leer auditoría pero no escribir progreso.\n\n## Patrón\n`AuthGuard` (401) → `CapabilitiesGuard` (403) vía `@RequireCapability()`. Denegado = 403 + fila en `audit_logs`. Ocultar un botón en el frontend NO es seguridad.",
+      "lab_prompt": "Con token mentor intenta `POST /progress/start` (sin `progress:write`). Confirma 403 y fila `capability.denied` en `GET /audit-logs/mine`. Repite con student (200).",
+      "checklist_json": ["Mentor recibe 403 en escritura", "Veo capability.denied en audit_logs", "Student escribe con 200"],
+      "estimated_minutes": 40
+    },
+    {
+      "track_slug": "backend", "order_index": 4,
+      "title": "Seguridad a nivel de recurso (Anti-IDOR) y Multi-tenancy",
+      "summary": "Propiedad, aislamiento por tenant y auditoría de denegados.",
+      "theory_md": "## Concepto\nIDOR: cambiar `:id` en URL por el de otro usuario y acceder a su recurso. Defensa: toda query de lectura/escritura filtra por propietario — `WHERE id=$1 AND user_id=$2` — además del guard global.\n\n## Regla de oro\nDefensa en profundidad: capability + scope en query + constraint en BD. Sin scope → 403/404 según proyecto + auditoría. Nunca devuelvas si existe o no el recurso ajeno si eso filtra información (elige 404).",
+      "lab_prompt": "Usa `GET /sandbox/idor-demo?progressId=<uuid-ajeno>` con tu token. Confirma `allowed:false`. Revisa `audit_logs` (`sandbox.idor.blocked`).",
+      "checklist_json": ["Reproduzco el bloqueo con ID ajeno", "Mi propio ID da allowed:true", "Hay fila de auditoría del bloqueo"],
+      "estimated_minutes": 40
+    },
+    {
+      "track_slug": "databases", "order_index": 0,
+      "title": "Modelado relacional e integridad",
+      "summary": "FKs, CHECK, UNIQUE, normalización y cuándo desnormalizar.",
+      "theory_md": "## Concepto\nLa BD es la última defensa: `FOREIGN KEY ... ON DELETE CASCADE`, `CHECK (status IN (...))`, `UNIQUE(user_id, lesson_id)`, `NOT NULL`. Normaliza (una verdad por dato); desnormaliza solo con medida (contadores cacheados).\n\n## En este proyecto\n- `user_progress(user_id, lesson_id)` único evita duplicados.\n- `CHECK` impide estados inválidos aunque el backend falle.\n- `notes_md` con límite de longitud a nivel app + `CHECK`.",
+      "lab_prompt": "Abre `001_init.sql`. Intenta insertar dos `user_progress` iguales (mismo user+lesson): confirma violación UNIQUE. Intenta `status='x'`: confirma violación CHECK.",
+      "checklist_json": ["Explico cada FK del esquema", "Reproduzco violación UNIQUE", "Reproduzco violación CHECK"],
+      "estimated_minutes": 35
+    },
+    {
+      "track_slug": "databases", "order_index": 1,
+      "title": "Índices y planes de ejecución",
+      "summary": "EXPLAIN ANALYZE, compuestos, parciales y cuellos de botella.",
+      "theory_md": "## Concepto\nSin índice, `WHERE user_id=$1` escanea toda la tabla (Seq Scan). Con índice B-tree, salta directo (Index Scan). Lee `EXPLAIN ANALYZE`: costo, filas, tiempo.\n\n## Índices del proyecto\n- `idx_lessons(track_id, order_index)` para listar lecciones en orden.\n- `idx_progress(user_id, status)` para el dashboard.\n- `idx_audit(user_id, created_at DESC)` para auditoría propia.\nEvita sobre-indexar: cada índice ralentiza escrituras.",
+      "lab_prompt": "Corre `EXPLAIN ANALYZE SELECT * FROM user_progress WHERE user_id='<tu-id>'`. Confirma Index Scan en `idx_progress_user_status`. Prueba sin el filtro y compara.",
+      "checklist_json": ["Leo un EXPLAIN ANALYZE básico", "Identifico los 3 índices del proyecto", "Explico costo de sobre-indexar"],
+      "estimated_minutes": 40
+    },
+    {
+      "track_slug": "databases", "order_index": 2,
+      "title": "Transacciones, aislamiento y concurrencia",
+      "summary": "ACID, bloqueos y prevención de race conditions.",
+      "theory_md": "## Concepto\n`POST /progress/start` usa `BEGIN → upsert → COMMIT` con `ON CONFLICT DO UPDATE`: dos clics simultáneos crean una sola fila (idempotente). Sin transacción, dos inserts paralelos duplicarían o fallarían a medias.\n\n## Niveles\nRead Committed (default) basta aquí; para contadores/saldos usa `SELECT ... FOR UPDATE` o constraints que la BD haga cumplir.",
+      "lab_prompt": "Dispara dos `POST /progress/start` con la misma `lesson_id` en paralelo. Confirma una sola fila en `user_progress` (UNIQUE user+lesson).",
+      "checklist_json": ["Explico BEGIN/COMMIT del endpoint start", "Doble start paralelo deja 1 fila", "Digo cuándo usar FOR UPDATE"],
+      "estimated_minutes": 40
+    },
+    {
+      "track_slug": "databases", "order_index": 3,
+      "title": "Migraciones seguras y seeding",
+      "summary": "Evolución sin pérdida de datos y entornos reproducibles.",
+      "theory_md": "## Concepto\nEl esquema evoluciona con migraciones numeradas (`001_init.sql`, `002_...`), aplicadas en orden y versionadas en git. Seed separado: `seed.mjs` (usuarios demo) y `seed-curriculum.mjs` (contenido, idempotente con `ON CONFLICT DO NOTHING/UPDATE`).\n\n## Reglas\n- Nunca edites una migración ya aplicada en otro entorno: crea una nueva.\n- Seed de contenido debe poder correrse N veces sin duplicar.",
+      "lab_prompt": "Corre `pnpm --filter @academy/api seed:curriculum` dos veces. Confirma `SELECT count(*) FROM lessons` = 25 ambas veces.",
+      "checklist_json": ["Migración y seed están separados", "Seed currículo es idempotente (25 siempre)", "Creo una migración nueva en vez de editar"],
+      "estimated_minutes": 30
+    },
+    {
+      "track_slug": "databases", "order_index": 4,
+      "title": "Caché y Redis",
+      "summary": "Cache-aside, invalidación, TTL y rate limiting.",
+      "theory_md": "## Concepto\nRedis guarda lo caliente: sesiones, rate-limit, `tracks` (rara vez cambian). Patrón cache-aside: lee caché → si miss, lee Postgres y guarda con TTL → invalida al escribir.\n\n## Riesgos\nCaché obsoleta (stale) y thundering herd. TTL corto (60-300s) para catálogos; invalidación explícita tras `curriculum:edit`. Rate limiting por IP+user evita abuso del login.",
+      "lab_prompt": "Conecta a Redis (`redis-cli ping`, `KEYS *`). Diseña en papel: ¿qué key y TTL usarías para `GET /tracks` y cuándo la invalidarías?",
+      "checklist_json": ["Conecto a Redis local", "Propongo key+TTL para tracks", "Defino invalidación tras edición"],
+      "estimated_minutes": 30
+    },
+    {
+      "track_slug": "services", "order_index": 0,
+      "title": "Arquitectura por capas",
+      "summary": "Controladores delgados, servicios de dominio y repositorios.",
+      "theory_md": "## Concepto\nControlador: HTTP (status, DTO). Servicio: reglas de dominio. Repositorio/query: SQL. En este esqueleto el controlador hace SQL directo por claridad; al crecer, extrae `ProgressService` (transición legal, cálculo de `next_review_at`) y `ProgressRepo` (queries con scope).\n\n## Señal de alarma\nControlador de 200 líneas o SQL con lógica de negocio duplicada en 3 endpoints → extrae servicio.",
+      "lab_prompt": "Lee `progress.controller.ts` y marca qué líneas son HTTP, cuáles dominio, cuáles SQL. Propón la firma de `ProgressService.update()` sin implementarla aún.",
+      "checklist_json": ["Separo las 3 capas en el archivo actual", "Propongo firma del servicio", "El controlador quedaría <60 líneas"],
+      "estimated_minutes": 35
+    },
+    {
+      "track_slug": "services", "order_index": 1,
+      "title": "Manejo centralizado de errores y observabilidad",
+      "summary": "Códigos semánticos, logs estructurados y Correlation IDs.",
+      "theory_md": "## Concepto\n`HttpExceptionFilter` unifica el formato `{requestId, statusCode, error}`. `RequestIdInterceptor` propaga `x-request-id` de entrada a salida para correlacionar logs frontend→backend→BD.\n\n## Mapa\n400 validación, 401 auth, 403 capability/scope, 404 no propio, 409 conflicto dominio, 500 inesperado (con request-id, sin stack al cliente).",
+      "lab_prompt": "Provoca un 400, un 401 y un 403 y guarda los 3 `requestId`. Verifica que el 403 dejó fila en `audit_logs` con ese contexto.",
+      "checklist_json": ["Muestro JSON uniforme de error", "Cada error trae request-id", "Asocio 400/401/403 a su causa"],
+      "estimated_minutes": 30
+    },
+    {
+      "track_slug": "services", "order_index": 2,
+      "title": "Integraciones externas resilientes",
+      "summary": "Timeouts, retries con backoff, idempotency keys y circuit breakers.",
+      "theory_md": "## Concepto\nTodo servicio externo falla: pon `timeout` (ej. 3s), reintenta solo lo idempotente con backoff exponencial + jitter, envía `Idempotency-Key` en POSTs, y abre el circuito tras N fallos para no cascada.\n\n## En estudio diario\nSi el proveedor de emails cae, tu `PATCH /progress` debe seguir respondiendo 200; el email va a cola (siguiente lección).",
+      "lab_prompt": "En papel: diseña el envío de email 'lección completada' con timeout 3s, 3 reintentos solo si el proveedor dice timeout, y qué harías si el circuito está abierto.",
+      "checklist_json": ["Defino timeout y reintentos", "Uso idempotency-key en el diseño", "El request principal no depende del email"],
+      "estimated_minutes": 35
+    },
+    {
+      "track_slug": "services", "order_index": 3,
+      "title": "Colas y workers asíncronos",
+      "summary": "Desacoplar lo pesado (emails, reportes, webhooks) de la respuesta.",
+      "theory_md": "## Concepto\nLo pesado no bloquea el response: el endpoint escribe en BD + encola (o tabla outbox en la misma transacción) y responde 200. Un worker consume, reintenta y marca hecho. Redis Streams / BullMQ o tabla `jobs` sirven para local.\n\n## Outbox\nSi la cola cae tras el COMMIT, el evento se pierde. Outbox: insertas el evento en la misma transacción Postgres; un relay lo publica luego. Garantía sin 2PC.",
+      "lab_prompt": "Dibuja el flujo 'completar lección → email + recalcular racha' con outbox: ¿qué tablas tocas en la transacción y qué hace el worker?",
+      "checklist_json": ["Separo sync vs async del flujo", "Explico outbox en 2 frases", "El 200 no espera al email"],
+      "estimated_minutes": 35
+    },
+    {
+      "track_slug": "services", "order_index": 4,
+      "title": "Testing en backend",
+      "summary": "Pirámide: unitarios de dominio + integración contra BD real.",
+      "theory_md": "## Concepto\nPirámide: muchos unitarios rápidos (transición `pending→completed`, cálculo de repaso), pocos e2e, e integración contra Postgres real (Docker) para scope/constraints: el mock no detecta un IDOR.\n\n## Casos mínimos aquí\n- update propio → 200. - update ajeno → 404 + audit. - body con `userId` → 400. - mentor sin capability → 403.",
+      "lab_prompt": "Escribe (o ejecuta manual con curl) los 4 casos anteriores y guárdalos como script. Todos deben pasar tras cada cambio de guards.",
+      "checklist_json": ["Tengo los 4 casos documentados", "Los 4 pasan en local", "Sé qué es test de integración vs unitario"],
+      "estimated_minutes": 45
+    },
+    {
+      "track_slug": "frontend", "order_index": 0,
+      "title": "Arquitectura de componentes y estado",
+      "summary": "Estado local, global y de servidor (caché, revalidación).",
+      "theory_md": "## Concepto\nLocal (`useState`): inputs, tabs. Global cliente: sesión/tema. Servidor: tracks/progress (caché + revalidación). No dupliques lo del servidor en estado global: revalida tras mutar (`start`/`update` → refetch `progress`).",
+      "lab_prompt": "En `apps/web/app/page.tsx`, tras `startProgress` añade refetch de `progress`. Verifica que el dashboard refleja el cambio sin recargar.",
+      "checklist_json": ["Distingo los 3 tipos de estado", "Mutación revalida la query", "Sin duplicar servidor en global"],
+      "estimated_minutes": 35
+    },
+    {
+      "track_slug": "frontend", "order_index": 1,
+      "title": "Formularios, validación compartida y UX defensiva",
+      "summary": "Esquemas compartidos, estados de carga y errores claros.",
+      "theory_md": "## Concepto\n`@academy/shared` exporta `loginSchema`/`updateProgressSchema`: el mismo Zod valida en web (feedback instantáneo) y en API (verdad final). UX: deshabilita submit mientras carga, muestra el `issues[]` del 400 en el campo, y mensaje accionable en 403/404.",
+      "lab_prompt": "En `/login`, valida email con el schema compartido antes de enviar. Muestra el error del 401/400 sin `alert()`.",
+      "checklist_json": ["Uso el schema compartido en el form", "Muestro error de campo, no genérico", "Botón se deshabilita cargando"],
+      "estimated_minutes": 35
+    },
+    {
+      "track_slug": "frontend", "order_index": 2,
+      "title": "Seguridad en el frontend",
+      "summary": "XSS, CSRF, tokens y por qué ocultar un botón no es seguridad.",
+      "theory_md": "## Concepto\n- XSS: React escapa por defecto; evita `dangerouslySetInnerHTML` con `notes_md` sin sanitizar.\n- Tokens: access en memoria, refresh en HttpOnly (JS no lo toca). Nada en `localStorage`.\n- CSRF: `SameSite=Lax` + (en producción) `Origin` check en mutaciones con cookie.\n- Ocultar 'Auditoría' al student es UX; el guard `audit:read` en API es la seguridad real.",
+      "lab_prompt": "Abre DevTools: confirma que no hay token en `localStorage`. Intenta `GET /audit-logs/mine` como student: confirma 403 aunque adivines la URL.",
+      "checklist_json": ["No hay token en localStorage", "Student recibe 403 en audit", "Explico XSS vs CSRF en 2 frases"],
+      "estimated_minutes": 35
+    },
+    {
+      "track_slug": "frontend", "order_index": 3,
+      "title": "Rendimiento web",
+      "summary": "Renderizado, code splitting, memoización y red.",
+      "theory_md": "## Concepto\nMide primero (Lighthouse / Network). Estrategias: Server Components para catálogo, `dynamic()` para el lab pesado, memoiza solo lo que re-renderiza mucho, pagina `audit_logs` (límite 100 ya puesto) y evita `fetch` en cascada.",
+      "lab_prompt": "Corre `pnpm --filter @academy/web build` y anota el First Load JS por ruta. Propón qué ruta partirías primero y por qué.",
+      "checklist_json": ["Leo el reporte de build", "Identifico la ruta más pesada", "Propongo un split concreto"],
+      "estimated_minutes": 30
+    },
+    {
+      "track_slug": "frontend", "order_index": 4,
+      "title": "Accesibilidad y diseño responsivo",
+      "summary": "Semántica HTML, teclado y sistemas consistentes.",
+      "theory_md": "## Concepto\na11y no es extra: `<h1>` único, labels en inputs, foco visible, contraste, navegación por teclado en sandbox y dashboard. Responsivo: mobile-first, un breakpoint, sin scroll horizontal.",
+      "lab_prompt": "Navega login→dashboard→sandbox solo con Tab/Enter. Corrige lo que no sea alcanzable o no tenga label.",
+      "checklist_json": ["Completo el flujo solo con teclado", "Inputs con label", "Sin scroll horizontal en móvil"],
+      "estimated_minutes": 30
+    },
+    {
+      "track_slug": "prod", "order_index": 0,
+      "title": "Docker y entornos reproducibles",
+      "summary": "Multi-stage builds, redes, volúmenes y variables.",
+      "theory_md": "## Concepto\n`docker compose up` levanta postgres+redis iguales para todos. Principios: imagen por servicio, multi-stage (build → runtime mínimo), volúmenes para datos, `.env` fuera de git, `healthcheck` antes de migrar.",
+      "lab_prompt": "Borra volúmenes (`docker compose down -v`), levanta de cero, migra y seed. Confirma 5 tracks y 25 lecciones. Documenta el orden exacto.",
+      "checklist_json": ["Reconstruyo desde cero sin errores", "Entiendo down -v vs down", ".env nunca commiteado"],
+      "estimated_minutes": 40
+    },
+    {
+      "track_slug": "prod", "order_index": 1,
+      "title": "CI/CD y calidad automatizada",
+      "summary": "Lint, typecheck, tests y migración antes de desplegar.",
+      "theory_md": "## Concepto\nPipeline mínimo: install → typecheck (`pnpm typecheck`) → tests → build → migraciones en staging → deploy. Todo cambio de guards/DTO/migración debe pasar los 4 casos del M3L5 antes de merge.",
+      "lab_prompt": "En papel (o GH Actions si quieres): define los 5 jobs con sus comandos pnpm y qué falla el pipeline (ej. typecheck rojo bloquea merge).",
+      "checklist_json": ["Listo los jobs en orden", "Typecheck y tests bloquean merge", "Migración corre antes que la app nueva"],
+      "estimated_minutes": 35
+    },
+    {
+      "track_slug": "prod", "order_index": 2,
+      "title": "Despliegue, reverse proxy y HTTPS",
+      "summary": "Nginx/Caddy, TLS, CORS y cabeceras Helmet.",
+      "theory_md": "## Concepto\nEn prod: TLS termina en el proxy, la API solo escucha en red interna, CORS con origen exacto (no `*` con credenciales), cookies `Secure`, cabeceras `Strict-Transport-Security`, `X-Content-Type-Options`, `frame-ancestors`. Este repo ya usa CORS estricto + cookies HttpOnly como base.",
+      "lab_prompt": "Revisa `main.ts` (CORS) y cookies de login. Anota qué cambiarías para `https://academy.midominio.com` (origen, Secure, proxy).",
+      "checklist_json": ["Identifico el origen CORS actual", "Sé qué cambia con HTTPS", "Listo 3 cabeceras de seguridad"],
+      "estimated_minutes": 35
+    },
+    {
+      "track_slug": "prod", "order_index": 3,
+      "title": "Monitoreo, alertas y respaldo",
+      "summary": "Health checks, métricas y backups.",
+      "theory_md": "## Concepto\nSalud: `/health` (API+DB+Redis). Métricas: latencia p95, tasa 5xx, logins fallidos, denegados 403/404 (picos = ataque o bug). Respaldo: `pg_dump` diario + restore probado; documenta RPO/RTO aunque sea local.",
+      "lab_prompt": "Añade mentalmente `GET /health` (db ping + redis ping). Haz `pg_dump` del academy y restaura en otra BD para probar el backup.",
+      "checklist_json": ["Defino qué chequea /health", "Tengo un dump restorable", "Defino 3 alertas con umbral"],
+      "estimated_minutes": 40
+    },
+    {
+      "track_slug": "prod", "order_index": 4,
+      "title": "Proyecto integrador: auditoría completa",
+      "summary": "Aplica los 24 puntos anteriores a tu propia app.",
+      "theory_md": "## Concepto\nRecorre tu app como atacante y como dueño: sin token, con token ajeno, con campos extra, con rol bajo, con doble clic, con BD caída. Cada hallazgo → fila en `audit_logs` o fix con test.\n\n## Entregable\nTabla: # | prueba | esperado | obtenido | veredicto. Cero 500 inesperados, cero IDOR, cero mass assignment, backup restaurado.",
+      "lab_prompt": "Ejecuta la batería completa (401/400/403/404/IDOR/doble-start/backup) y registra la tabla. Corrige lo que falle y deja el commit.",
+      "checklist_json": ["Batería completa registrada", "Cero IDOR y cero mass assignment", "Backup restaurado y commit hecho"],
+      "estimated_minutes": 60
+    }
+  ]
+}

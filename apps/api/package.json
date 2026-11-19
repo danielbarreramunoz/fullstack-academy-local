@@ -9,7 +9,9 @@
     "start": "node dist/main.js",
     "test": "node --test dist/**/*.spec.js 2>/dev/null || echo \"api: sin tests unitarios aun\"",
     "migration:run": "node scripts/migrate.mjs",
-    "seed": "node scripts/seed.mjs"
+    "seed": "node scripts/seed.mjs",
+    "seed:curriculum": "node scripts/seed-curriculum.mjs",
+    "seed:all": "node scripts/seed.mjs && node scripts/seed-curriculum.mjs"
   },
   "dependencies": {
     "@academy/shared": "workspace:*",

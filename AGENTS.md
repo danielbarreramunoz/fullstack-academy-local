@@ -16,5 +16,7 @@ Stack: pnpm monorepo + NestJS (API) + Next.js (web) + PostgreSQL 16 + Redis 7 + 
 - `docker compose up -d` → postgres:5432 + redis:6379
 - `pnpm install` → instala workspaces
 - `pnpm --filter @academy/api migration:run` → migraciones SQL
-- `pnpm --filter @academy/api seed` → usuarios demo + tracks/lessons demo
+- `pnpm --filter @academy/api seed` → usuarios demo + capabilities
+- `pnpm --filter @academy/api seed:curriculum` → 5 tracks + 25 lecciones (idempotente)
+- `pnpm --filter @academy/api seed:all` → usuarios + currículo
 - `pnpm typecheck` → tsc en shared/api/web

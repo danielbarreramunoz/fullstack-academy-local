@@ -29,24 +29,5 @@ for (const u of users) {
   }
 }
 
-const tracks = [
-  { slug: "backend", title: "Backend y flujo de peticiones", order_index: 0, description: "Módulo 1" },
-  { slug: "db", title: "Bases de datos y consistencia", order_index: 1, description: "Módulo 2" },
-];
-for (const t of tracks) {
-  await db.query(
-    `INSERT INTO tracks (slug, title, order_index, description) VALUES ($1,$2,$3,$4) ON CONFLICT (slug) DO NOTHING`,
-    [t.slug, t.title, t.order_index, t.description],
-  );
-}
-const { rows: tr } = await db.query(`SELECT id FROM tracks WHERE slug='backend'`);
-if (tr[0]) {
-  await db.query(
-    `INSERT INTO lessons (track_id, order_index, title, summary, theory_md, lab_prompt, checklist_json, estimated_minutes)
-     VALUES ($1,0,'Ciclo de vida de una petición','De la red al controlador','## Teoría demo\n\nRequest-id → guard → validación → servicio → repo.','Levanta la API y traza un x-request-id.','{"items":["Explico el flujo","Trazo un request-id","Anoto una duda"]}',30)
-     ON CONFLICT DO NOTHING`,
-    [tr[0].id],
-  );
-}
 await db.end();
-console.log("seed demo ok: student@local.test / mentor@local.test / admin@local.test");
+console.log("seed usuarios ok: student@local.test / mentor@local.test / admin@local.test");
