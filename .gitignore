@@ -1,0 +1,9 @@
+.harness/
+node_modules/
+dist/
+.next/
+out/
+.env
+*.local
+postgres-data/
+redis-data/

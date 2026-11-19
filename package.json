@@ -1,0 +1,12 @@
+{
+  "name": "fullstack-academy-local",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@12.21.0",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "dev": "docker compose up -d && pnpm -r --parallel dev"
+  }
+}
