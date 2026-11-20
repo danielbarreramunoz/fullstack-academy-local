@@ -351,9 +351,9 @@ function LessonDetail() {
                 </span>
                 <h2 style={{ fontSize: "1.02rem" }}>Laboratorio</h2>
               </div>
-              <p className="soft tiny mt-1" style={{ lineHeight: 1.7 }}>
-                {lesson.lab_prompt}
-              </p>
+              <div className="mt-1">
+                <Markdown source={lesson.lab_prompt} />
+              </div>
             </section>
           ) : null}
 
