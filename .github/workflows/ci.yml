@@ -17,6 +17,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
+      # build primero: api/web resuelven @academy/shared desde packages/shared/dist
       - run: pnpm build
+      - run: pnpm typecheck
       - run: pnpm test
