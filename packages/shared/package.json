@@ -8,13 +8,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "echo \"shared: sin tests aun\"",
+    "test": "tsc -p tsconfig.json && node --test $(find dist -name '*.spec.js')",
     "dev": "echo \"shared: watch via tsc\""
   },
   "dependencies": {
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "typescript": "^5.5.4"
   }
 }

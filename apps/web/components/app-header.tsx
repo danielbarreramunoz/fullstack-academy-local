@@ -66,27 +66,29 @@ export function AppHeader() {
           </span>
         </Link>
 
-        <nav className="nav" aria-label="Navegación principal">
-          {links.map((link) => {
-            const active =
-              link.href === "/"
-                ? pathname === "/" || pathname.startsWith("/tracks") || pathname.startsWith("/lessons")
-                : pathname.startsWith(link.href);
-            const Icon = link.icon;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="nav-link"
-                data-active={active}
-                aria-current={active ? "page" : undefined}
-              >
-                <Icon size={15} />
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+        {me ? (
+          <nav className="nav" aria-label="Navegación principal">
+            {links.map((link) => {
+              const active =
+                link.href === "/"
+                  ? pathname === "/" || pathname.startsWith("/tracks") || pathname.startsWith("/lessons")
+                  : pathname.startsWith(link.href);
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="nav-link"
+                  data-active={active}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <Icon size={15} />
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+        ) : null}
 
         <div className="topbar-right">
           <button

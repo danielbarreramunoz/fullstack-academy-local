@@ -7,7 +7,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "dev": "tsc-watch --onSuccess \"node dist/main.js\" || tsc -p tsconfig.json && node dist/main.js",
     "start": "node dist/main.js",
-    "test": "node --test dist/**/*.spec.js 2>/dev/null || echo \"api: sin tests unitarios aun\"",
+    "test": "tsc -p tsconfig.json && node --test $(find dist -name '*.spec.js')",
     "migration:run": "node scripts/migrate.mjs",
     "seed": "node scripts/seed.mjs",
     "seed:curriculum": "node scripts/seed-curriculum.mjs",

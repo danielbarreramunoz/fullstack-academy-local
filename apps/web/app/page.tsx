@@ -150,18 +150,11 @@ function Dashboard() {
               tutoriales infinitos: progreso verificable en 30–60 minutos.
             </p>
             <div className="hero-actions">
-              {canWrite ? (
-                continueItem ? (
-                  <Link href={`/lessons/${continueItem.lesson_id}`} className="btn btn-primary">
-                    <IconPlay size={15} />
-                    {continueItem.status === "in_progress" ? "Continuar lección" : "Empezar siguiente"}
-                  </Link>
-                ) : (
-                  <a href="#tracks" className="btn btn-primary">
-                    <IconBook size={16} />
-                    Explorar tracks
-                  </a>
-                )
+              {canWrite && continueItem ? (
+                <Link href={`/lessons/${continueItem.lesson_id}`} className="btn btn-primary">
+                  <IconPlay size={15} />
+                  {continueItem.status === "in_progress" ? "Continuar lección" : "Empezar siguiente"}
+                </Link>
               ) : (
                 <a href="#tracks" className="btn btn-primary">
                   <IconBook size={16} />
