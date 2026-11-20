@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppHeader } from "../components/app-header";
+import { SessionProvider } from "../lib/session";
 
 export const metadata: Metadata = {
   title: "Academy — estudio full-stack",
@@ -35,10 +36,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <div className="shell">
-          <AppHeader />
-          <main className="main">
-            <div className="container">{children}</div>
-          </main>
+          <SessionProvider>
+            <AppHeader />
+            <main className="main">
+              <div className="container">{children}</div>
+            </main>
+          </SessionProvider>
           <footer className="footer">
             <div className="container footer-inner">
               <span>

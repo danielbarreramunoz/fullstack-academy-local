@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api-client";
-import type { Me } from "../lib/types";
+import { useSession } from "../lib/session";
 import { IconFlask, IconGrid, IconLogo, IconLogout, IconMoon, IconSun } from "./icons";
 
 type Theme = "dark" | "light";
@@ -19,35 +19,13 @@ export function AppHeader() {
   const router = useRouter();
   const [theme, setTheme] = useState<Theme>("dark");
   const [mounted, setMounted] = useState(false);
-  const [me, setMe] = useState<Me | null>(null);
-  const [meLoaded, setMeLoaded] = useState(false);
+  const { user: me, loading, refresh } = useSession();
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
   }, []);
-
-  useEffect(() => {
-    let active = true;
-    api
-      .me()
-      .then((res) => {
-        if (active) {
-          setMe(res.user);
-          setMeLoaded(true);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setMe(null);
-          setMeLoaded(true);
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [pathname]);
 
   function toggleTheme() {
     const next: Theme = theme === "dark" ? "light" : "dark";
@@ -67,7 +45,7 @@ export function AppHeader() {
     } catch {
       /* la cookie puede seguir viva si la API no responde */
     }
-    setMe(null);
+    await refresh();
     setBusy(false);
     router.push("/login");
     router.refresh();
@@ -121,7 +99,7 @@ export function AppHeader() {
             {mounted && theme === "light" ? <IconSun size={17} /> : <IconMoon size={17} />}
           </button>
 
-          {pathname === "/login" ? null : !mounted || !meLoaded ? (
+          {pathname === "/login" ? null : !mounted || loading ? (
             <span
               className="skeleton"
               style={{ width: 108, height: 38, borderRadius: 999 }}

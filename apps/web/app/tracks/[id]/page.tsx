@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../../../lib/api-client";
+import { useSession } from "../../../lib/session";
 import type { Lesson, ProgressRow, Track } from "../../../lib/types";
+import { RequireAuth } from "../../../components/require-auth";
 import { Alert, EmptyState, SkeletonList, StatusBadge } from "../../../components/ui";
 import {
   IconArrowLeft,
@@ -28,7 +30,17 @@ const FILTERS: { id: Filter; label: string }[] = [
 ];
 
 export default function TrackPage() {
+  return (
+    <RequireAuth>
+      <TrackDetail />
+    </RequireAuth>
+  );
+}
+
+function TrackDetail() {
   const params = useParams<{ id: string }>();
+  const { can } = useSession();
+  const canWrite = can("progress:write");
   const router = useRouter();
   const trackId = params?.id;
 
@@ -91,7 +103,8 @@ export default function TrackPage() {
 
   async function openLesson(lesson: Lesson) {
     const existing = progressByLesson.get(lesson.id);
-    if (existing) {
+    if (existing || !canWrite) {
+      // Solo lectura (sin progress:write) o progreso ya existente: navegar sin escribir.
       router.push(`/lessons/${lesson.id}`);
       return;
     }
@@ -171,20 +184,27 @@ export default function TrackPage() {
             <p className="lead">{track?.description ?? "Ruta del plan de estudio full-stack."}</p>
             <div className="hero-actions">
               {lessons.length > 0 ? (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    const next =
-                      lessons.find((l) => {
-                        const s = progressByLesson.get(l.id)?.status;
-                        return s === "in_progress";
-                      }) ?? lessons.find((l) => progressByLesson.get(l.id)?.status !== "completed");
-                    if (next) void openLesson(next);
-                  }}
-                >
-                  <IconPlay size={15} />
-                  {active > 0 ? "Continuar track" : done > 0 ? "Seguir con la siguiente" : "Empezar track"}
-                </button>
+                canWrite ? (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      const next =
+                        lessons.find((l) => {
+                          const s = progressByLesson.get(l.id)?.status;
+                          return s === "in_progress";
+                        }) ?? lessons.find((l) => progressByLesson.get(l.id)?.status !== "completed");
+                      if (next) void openLesson(next);
+                    }}
+                  >
+                    <IconPlay size={15} />
+                    {active > 0 ? "Continuar track" : done > 0 ? "Seguir con la siguiente" : "Empezar track"}
+                  </button>
+                ) : (
+                  <a href="#lecciones" className="btn btn-primary">
+                    <IconBook size={16} />
+                    Ver lecciones
+                  </a>
+                )
               ) : null}
               <Link href="/" className="btn btn-ghost">
                 <IconArrowLeft size={15} />
@@ -226,11 +246,15 @@ export default function TrackPage() {
         </div>
       </section>
 
-      <section className="section">
+      <section className="section" id="lecciones">
         <div className="section-head">
           <div>
             <h2>Lecciones</h2>
-            <p>Teoría breve, fallo provocado, reto y checklist.</p>
+            <p>
+              {canWrite
+                ? "Teoría breve, fallo provocado, reto y checklist."
+                : "Teoría breve, fallo provocado, reto y checklist. Tu rol es de solo lectura."}
+            </p>
           </div>
           <div className="row" style={{ gap: 6 }}>
             {FILTERS.map((f) => (
@@ -299,13 +323,13 @@ export default function TrackPage() {
                     className={`btn btn-sm ${status === "completed" ? "btn-ghost" : "btn-soft"}`}
                     onClick={() => void openLesson(lesson)}
                     disabled={isOpening}
-                    aria-label={`${p ? "Abrir" : "Empezar"} ${lesson.title}`}
+                    aria-label={`${!canWrite || p ? "Abrir" : "Empezar"} ${lesson.title}`}
                   >
                     {isOpening ? (
                       <span className="spinner" />
                     ) : (
                       <>
-                        {status === "completed" ? "Repasar" : status ? "Continuar" : "Empezar"}
+                        {!canWrite || p ? (status === "completed" ? "Repasar" : p ? "Continuar" : "Abrir") : "Empezar"}
                         <IconArrowRight size={13} />
                       </>
                     )}

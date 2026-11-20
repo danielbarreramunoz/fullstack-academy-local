@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../../lib/api-client";
+import { useSession } from "../../lib/session";
 import type { AuditLog, IdorResult, ProgressRow } from "../../lib/types";
+import { RequireAuth } from "../../components/require-auth";
 import { Alert, EmptyState, TimeAgo } from "../../components/ui";
 import {
   IconArrowLeft,
@@ -19,6 +21,16 @@ import {
 } from "../../components/icons";
 
 export default function SandboxPage() {
+  return (
+    <RequireAuth>
+      <SecurityLab />
+    </RequireAuth>
+  );
+}
+
+function SecurityLab() {
+  const { can } = useSession();
+  const canWrite = can("progress:write");
   const [id, setId] = useState("");
   const [result, setResult] = useState<IdorResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -82,7 +94,11 @@ export default function SandboxPage() {
 
   function useMine() {
     if (progress.length === 0) {
-      setError("Aún no tienes progreso. Empieza una lección para generar un progressId.");
+      setError(
+        canWrite
+          ? "Aún no tienes progreso. Empieza una lección para generar un progressId."
+          : "Tu rol es de solo lectura y no genera progreso. Usa «Generar UUID ajeno».",
+      );
       return;
     }
     setError("");
@@ -286,11 +302,17 @@ export default function SandboxPage() {
             </p>
             {progress.length === 0 ? (
               <p className="tiny muted mt-2">
-                Sin progreso todavía.{" "}
-                <Link href="/" className="tiny">
-                  Empieza una lección
-                </Link>
-                .
+                {canWrite ? (
+                  <>
+                    Sin progreso todavía.{" "}
+                    <Link href="/" className="tiny">
+                      Empieza una lección
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  "Tu rol es de solo lectura y no genera progreso: usa «Generar UUID ajeno» para probar el bloqueo."
+                )}
               </p>
             ) : (
               <div className="stack mt-2" style={{ gap: 8 }}>

@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../../../lib/api-client";
+import { useSession } from "../../../lib/session";
 import type { Lesson, ProgressRow, Track } from "../../../lib/types";
+import { RequireAuth } from "../../../components/require-auth";
 import { Alert, EmptyState, Markdown, StatusBadge, TimeAgo } from "../../../components/ui";
 import {
   IconArrowLeft,
@@ -14,6 +16,7 @@ import {
   IconCheckCircle,
   IconClock,
   IconClipboard,
+  IconLock,
   IconNotes,
   IconPlay,
   IconRefresh,
@@ -36,7 +39,17 @@ function formatDate(value: string | null) {
 }
 
 export default function LessonPage() {
+  return (
+    <RequireAuth>
+      <LessonDetail />
+    </RequireAuth>
+  );
+}
+
+function LessonDetail() {
   const params = useParams<{ id: string }>();
+  const { can } = useSession();
+  const canWrite = can("progress:write");
   const lessonId = params?.id;
 
   const [phase, setPhase] = useState<Phase>("loading");
@@ -278,24 +291,41 @@ export default function LessonPage() {
           </div>
         </div>
         <div className="row">
-          {status === "completed" ? (
-            <button className="btn btn-ghost" onClick={reopen} disabled={busy !== ""}>
-              {busy === "reopen" ? <span className="spinner" /> : <IconRefresh size={15} />}
-              Reabrir
-            </button>
-          ) : status ? (
-            <button className="btn btn-primary" onClick={complete} disabled={busy !== ""}>
-              {busy === "complete" ? <span className="spinner" /> : <IconCheck size={16} />}
-              Marcar completada
-            </button>
+          {canWrite ? (
+            status === "completed" ? (
+              <button className="btn btn-ghost" onClick={reopen} disabled={busy !== ""}>
+                {busy === "reopen" ? <span className="spinner" /> : <IconRefresh size={15} />}
+                Reabrir
+              </button>
+            ) : status ? (
+              <button className="btn btn-primary" onClick={complete} disabled={busy !== ""}>
+                {busy === "complete" ? <span className="spinner" /> : <IconCheck size={16} />}
+                Marcar completada
+              </button>
+            ) : (
+              <button className="btn btn-primary" onClick={start} disabled={busy !== ""}>
+                {busy === "start" ? <span className="spinner" /> : <IconPlay size={15} />}
+                Empezar lección
+              </button>
+            )
           ) : (
-            <button className="btn btn-primary" onClick={start} disabled={busy !== ""}>
-              {busy === "start" ? <span className="spinner" /> : <IconPlay size={15} />}
-              Empezar lección
-            </button>
+            <span className="pill">
+              <IconLock size={13} />
+              Solo lectura
+            </span>
           )}
         </div>
       </header>
+
+      {!canWrite ? (
+        <div className="mb-3">
+          <Alert tone="info">
+            Estás en modo lectura: tu rol no incluye la capability{" "}
+            <code className="mono">progress:write</code>, así que puedes estudiar el contenido pero
+            no registrar progreso ni guardar notas.
+          </Alert>
+        </div>
+      ) : null}
 
       {notice ? (
         <div className="mb-3">
@@ -384,20 +414,24 @@ export default function LessonPage() {
             </div>
 
             <div className="mt-2">
-              {status === "completed" ? (
-                <button className="btn btn-ghost btn-block" onClick={reopen} disabled={busy !== ""}>
-                  <IconRefresh size={15} /> Volver a practicar
-                </button>
-              ) : status ? (
-                <button className="btn btn-primary btn-block" onClick={complete} disabled={busy !== ""}>
-                  {busy === "complete" ? <span className="spinner" /> : <IconCheck size={16} />}
-                  Marcar completada
-                </button>
+              {canWrite ? (
+                status === "completed" ? (
+                  <button className="btn btn-ghost btn-block" onClick={reopen} disabled={busy !== ""}>
+                    <IconRefresh size={15} /> Volver a practicar
+                  </button>
+                ) : status ? (
+                  <button className="btn btn-primary btn-block" onClick={complete} disabled={busy !== ""}>
+                    {busy === "complete" ? <span className="spinner" /> : <IconCheck size={16} />}
+                    Marcar completada
+                  </button>
+                ) : (
+                  <button className="btn btn-primary btn-block" onClick={start} disabled={busy !== ""}>
+                    {busy === "start" ? <span className="spinner" /> : <IconPlay size={15} />}
+                    Empezar lección
+                  </button>
+                )
               ) : (
-                <button className="btn btn-primary btn-block" onClick={start} disabled={busy !== ""}>
-                  {busy === "start" ? <span className="spinner" /> : <IconPlay size={15} />}
-                  Empezar lección
-                </button>
+                <p className="tiny muted mt-2">Sin acciones: modo solo lectura.</p>
               )}
             </div>
           </section>
@@ -454,17 +488,24 @@ export default function LessonPage() {
               className="textarea mt-2"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder={"Qué aprendí, qué fallo provoqué, qué me falta…"}
+              placeholder={
+                canWrite
+                  ? "Qué aprendí, qué fallo provoqué, qué me falta…"
+                  : "Modo solo lectura: tu rol no puede guardar notas."
+              }
               aria-label="Notas de la lección"
+              disabled={!canWrite}
             />
-            <button
-              className="btn btn-soft btn-sm btn-block mt-2"
-              onClick={saveNotes}
-              disabled={busy !== "" || !dirty}
-            >
-              {busy === "notes" ? <span className="spinner" /> : <IconNotes size={14} />}
-              Guardar notas
-            </button>
+            {canWrite ? (
+              <button
+                className="btn btn-soft btn-sm btn-block mt-2"
+                onClick={saveNotes}
+                disabled={busy !== "" || !dirty}
+              >
+                {busy === "notes" ? <span className="spinner" /> : <IconNotes size={14} />}
+                Guardar notas
+              </button>
+            ) : null}
           </section>
         </aside>
       </div>

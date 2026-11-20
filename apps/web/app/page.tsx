@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { api, ApiError } from "../lib/api-client";
-import type { Me, ProgressRow, Track } from "../lib/types";
+import { api } from "../lib/api-client";
+import { useSession } from "../lib/session";
+import type { ProgressRow, Track } from "../lib/types";
+import { RequireAuth } from "../components/require-auth";
 import {
   Alert,
   EmptyState,
@@ -27,12 +29,21 @@ import {
   IconTarget,
 } from "../components/icons";
 
-type Phase = "loading" | "anon" | "ready" | "error";
+type Phase = "loading" | "ready" | "error";
 
 export default function Home() {
+  return (
+    <RequireAuth>
+      <Dashboard />
+    </RequireAuth>
+  );
+}
+
+function Dashboard() {
+  const { user: me, can } = useSession();
+  const canWrite = can("progress:write");
   const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState("");
-  const [me, setMe] = useState<Me | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [progress, setProgress] = useState<ProgressRow[]>([]);
   const [today, setToday] = useState("");
@@ -41,17 +52,11 @@ export default function Home() {
     setPhase("loading");
     setError("");
     try {
-      const res = await api.me();
-      setMe(res.user);
       const [trackRows, progressRows] = await Promise.all([api.tracks(), api.progress()]);
       setTracks(trackRows);
       setProgress(progressRows);
       setPhase("ready");
     } catch (e) {
-      if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
-        setPhase("anon");
-        return;
-      }
       setError(e instanceof Error ? e.message : "Error inesperado");
       setPhase("error");
     }
@@ -84,10 +89,6 @@ export default function Home() {
         </div>
       </div>
     );
-  }
-
-  if (phase === "anon") {
-    return <Landing />;
   }
 
   if (phase === "error") {
@@ -149,11 +150,18 @@ export default function Home() {
               tutoriales infinitos: progreso verificable en 30–60 minutos.
             </p>
             <div className="hero-actions">
-              {continueItem ? (
-                <Link href={`/lessons/${continueItem.lesson_id}`} className="btn btn-primary">
-                  <IconPlay size={15} />
-                  {continueItem.status === "in_progress" ? "Continuar lección" : "Empezar siguiente"}
-                </Link>
+              {canWrite ? (
+                continueItem ? (
+                  <Link href={`/lessons/${continueItem.lesson_id}`} className="btn btn-primary">
+                    <IconPlay size={15} />
+                    {continueItem.status === "in_progress" ? "Continuar lección" : "Empezar siguiente"}
+                  </Link>
+                ) : (
+                  <a href="#tracks" className="btn btn-primary">
+                    <IconBook size={16} />
+                    Explorar tracks
+                  </a>
+                )
               ) : (
                 <a href="#tracks" className="btn btn-primary">
                   <IconBook size={16} />
@@ -166,6 +174,12 @@ export default function Home() {
               </Link>
             </div>
             <div className="hero-chips">
+              {!canWrite ? (
+                <span className="pill">
+                  <IconShield size={13} />
+                  Modo supervisión · rol {me?.role} (lectura)
+                </span>
+              ) : null}
               <span className="pill">
                 <IconTarget size={13} />
                 Meta diaria: 1 lección
@@ -184,8 +198,9 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="section" style={{ marginTop: 20 }}>
-        <div className="kpi-grid">
+      {canWrite ? (
+        <div className="section" style={{ marginTop: 20 }}>
+          <div className="kpi-grid">
           <div className="card card-pad kpi">
             <div className="kpi-top">
               <span>Completadas</span>
@@ -226,8 +241,9 @@ export default function Home() {
             <div className="kpi-value">{dueReviews.length}</div>
             <div className="kpi-sub">{pending.length} pendientes por empezar</div>
           </div>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="dash-grid section">
         <section id="tracks">
@@ -291,11 +307,29 @@ export default function Home() {
         </section>
 
         <aside className="stack">
-          <div className="card card-pad">
-            <div className="row-between">
-              <h2>Continuar</h2>
-              <IconPlay size={15} />
+          {!canWrite ? (
+            <div className="card card-pad">
+              <div className="row-between">
+                <h2>Modo supervisión</h2>
+                <IconShield size={16} />
+              </div>
+              <p className="tiny muted mt-1">
+                Tu rol <code className="mono">{me?.role}</code> es de lectura: puedes recorrer
+                tracks y lecciones, pero no registras progreso. El security lab y la auditoría
+                siguen disponibles según tus capabilities.
+              </p>
+              <Link href="/sandbox" className="btn btn-soft btn-sm btn-block mt-2">
+                <IconFlask size={14} />
+                Abrir security lab
+              </Link>
             </div>
+          ) : null}
+          {canWrite ? (
+            <div className="card card-pad">
+              <div className="row-between">
+                <h2>Continuar</h2>
+                <IconPlay size={15} />
+              </div>
             {continueItem ? (
               <div className="mt-2">
                 <div className="list">
@@ -326,12 +360,14 @@ export default function Home() {
               />
             )}
           </div>
+          ) : null}
 
-          <div className="card card-pad">
-            <div className="row-between">
-              <h2>Repaso programado</h2>
-              <span className="badge badge-neutral badge-sm">{reviews.length}</span>
-            </div>
+          {canWrite ? (
+            <div className="card card-pad">
+              <div className="row-between">
+                <h2>Repaso programado</h2>
+                <span className="badge badge-neutral badge-sm">{reviews.length}</span>
+              </div>
             {reviews.length === 0 ? (
               <EmptyState
                 icon={<IconRefresh size={19} />}
@@ -369,7 +405,8 @@ export default function Home() {
                 })}
               </div>
             )}
-          </div>
+            </div>
+          ) : null}
 
           <div className="card card-pad">
             <div className="row-between">
@@ -388,10 +425,11 @@ export default function Home() {
         </aside>
       </div>
 
-      <section className="section">
-        <div className="section-head">
-          <div>
-            <h2>Actividad reciente</h2>
+      {canWrite ? (
+        <section className="section">
+          <div className="section-head">
+            <div>
+              <h2>Actividad reciente</h2>
             <p>Últimos cambios de progreso registrados.</p>
           </div>
           <span className="pill">
@@ -446,88 +484,8 @@ export default function Home() {
             </table>
           </div>
         )}
-      </section>
-    </div>
-  );
-}
-
-function Landing() {
-  return (
-    <div>
-      <section className="hero">
-        <div className="hero-content">
-          <div className="hero-copy">
-            <span className="eyebrow">
-              <IconSpark size={13} />
-              Academy local
-            </span>
-            <h1>
-              Full-stack en sesiones cortas. <span className="gradient-text">Sin ruido.</span>
-            </h1>
-            <p className="lead">
-              Una ruta guiada de cinco tracks y veinticinco lecciones. Cada sesión combina teoría,
-              un fallo que provocas, un reto y una checklist de salida.
-            </p>
-            <div className="hero-actions">
-              <Link href="/login" className="btn btn-primary">
-                Entrar al dashboard <IconArrowRight size={15} />
-              </Link>
-              <Link href="/sandbox" className="btn btn-ghost">
-                <IconFlask size={16} />
-                Ver security lab
-              </Link>
-            </div>
-            <div className="hero-chips">
-              <span className="pill">
-                <IconTarget size={13} />
-                30–60 min al día
-              </span>
-              <span className="pill">
-                <IconBook size={13} />
-                5 tracks · 25 lecciones
-              </span>
-              <span className="pill">
-                <IconShield size={13} />
-                Anti-IDOR por diseño
-              </span>
-            </div>
-          </div>
-          <Ring value={0} label="Tu progreso" />
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="feature-grid">
-          <article className="card card-pad">
-            <span className="kpi-icon">
-              <IconBook size={17} />
-            </span>
-            <h3 className="mt-3">Ruta guiada</h3>
-            <p className="tiny muted mt-1">
-              Tracks ordenados de fundamentos a producción. Cada lección con teoría breve, laboratorio
-              y checklist.
-            </p>
-          </article>
-          <article className="card card-pad">
-            <span className="kpi-icon violet">
-              <IconShield size={17} />
-            </span>
-            <h3 className="mt-3">Seguridad real</h3>
-            <p className="tiny muted mt-1">
-              Laboratorio anti-IDOR con auditoría. Comprueba el bloqueo 403/404 sobre recursos ajenos.
-            </p>
-          </article>
-          <article className="card card-pad">
-            <span className="kpi-icon green">
-              <IconCheckCircle size={17} />
-            </span>
-            <h3 className="mt-3">Progreso medible</h3>
-            <p className="tiny muted mt-1">
-              Estados pending, in_progress y completed, notas por lección y repasos programados.
-            </p>
-          </article>
-        </div>
-      </section>
+        </section>
+      ) : null}
     </div>
   );
 }

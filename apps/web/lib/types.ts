@@ -48,6 +48,7 @@ export interface Me {
   id: string;
   email: string;
   role: "student" | "mentor" | "admin";
+  capabilities: string[];
 }
 
 export interface IdorResult {

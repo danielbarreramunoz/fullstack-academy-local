@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { api } from "../../lib/api-client";
 import { Alert } from "../../components/ui";
 import {
@@ -25,7 +25,26 @@ const DEMOS = [
 ];
 
 export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="stack mt-4" aria-hidden>
+          <div className="skeleton" style={{ height: 62 }} />
+          <div className="skeleton" style={{ height: 62 }} />
+          <div className="skeleton" style={{ height: 40 }} />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawNext = searchParams.get("next");
+  const next = rawNext && rawNext.startsWith("/") ? rawNext : "/";
   const [email, setEmail] = useState("student@local.test");
   const [password, setPassword] = useState("student123");
   const [show, setShow] = useState(false);
@@ -38,7 +57,7 @@ export default function LoginPage() {
     api
       .me()
       .then(() => {
-        if (active) router.replace("/");
+        if (active) router.replace(next);
       })
       .catch(() => {
         if (active) setChecking(false);
@@ -46,7 +65,7 @@ export default function LoginPage() {
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [router, next]);
 
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -55,7 +74,7 @@ export default function LoginPage() {
     setMsg("");
     try {
       await api.login(email.trim(), password);
-      router.push("/");
+      router.push(next);
       router.refresh();
     } catch (err) {
       const raw = err instanceof Error ? err.message : "";
