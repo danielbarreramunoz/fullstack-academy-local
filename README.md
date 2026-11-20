@@ -2,7 +2,17 @@
 
 Plataforma de estudio local: tracks, lecciones, progreso de usuario, capabilities y audit logs.
 
-Stack: **pnpm monorepo + NestJS (API) + Next.js (web) + PostgreSQL 16 + Redis 7 + migraciones SQL**.
+## Tecnologías
+
+| Capa | Herramientas |
+|---|---|
+| Monorepo | pnpm workspaces (12.x), TypeScript 5.5 en estricto |
+| API (`apps/api`) | NestJS 10, `pg` (PostgreSQL 16), JWT (`jsonwebtoken`: access 15m + refresh 7d), `bcryptjs`, Zod, `cookie-parser` |
+| Web (`apps/web`) | Next.js 14, React 18, CSS propio (sin framework UI) |
+| Compartido (`packages/shared`) | Tipos + esquemas Zod (fuente de verdad de capabilities y DTOs) |
+| Datos | SQL numeradas en `apps/api/src/database/migrations/*.sql` + scripts de seed (`seed`, `seed:curriculum`, `seed:all`); Redis 7 levantado en compose (disponible, sin uso en código aún) |
+| Tests | `node:test` + `node:assert/strict` (cero dependencias): specs en `packages/shared` (schemas, matriz de roles) y `apps/api` (`CapabilitiesGuard`) |
+| CI | GitHub Actions (`.github/workflows/ci.yml`): install → build → typecheck → test |
 
 ## Requisitos
 
@@ -26,7 +36,9 @@ pnpm dev                    # API :3001 + web :3000
 | Comando | Qué hace |
 |---|---|
 | `pnpm dev` | levanta DB + API + web en paralelo |
+| `pnpm build` | compila shared / api / web (requerido antes de `typecheck` en limpio) |
 | `pnpm typecheck` | `tsc` en shared / api / web |
+| `pnpm test` | unitarios con `node:test` (shared 8 + api 3; web aún sin tests) |
 | `pnpm --filter @academy/api migration:run` | corre migraciones SQL |
 | `pnpm --filter @academy/api seed` | usuarios demo + capabilities |
 | `pnpm --filter @academy/api seed:curriculum` | 5 tracks + 25 lecciones (idempotente) |
