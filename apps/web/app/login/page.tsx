@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { api } from "../../lib/api-client";
+import { useSession } from "../../lib/session";
 import { Alert } from "../../components/ui";
 import {
   IconArrowLeft,
@@ -43,6 +44,7 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, loading: sessionLoading, refresh } = useSession();
   const rawNext = searchParams.get("next");
   const next = rawNext && rawNext.startsWith("/") ? rawNext : "/";
   const [email, setEmail] = useState("student@local.test");
@@ -50,22 +52,10 @@ function LoginForm() {
   const [show, setShow] = useState(false);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    let active = true;
-    api
-      .me()
-      .then(() => {
-        if (active) router.replace(next);
-      })
-      .catch(() => {
-        if (active) setChecking(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [router, next]);
+    if (!sessionLoading && user) router.replace(next);
+  }, [sessionLoading, user, next, router]);
 
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -74,6 +64,9 @@ function LoginForm() {
     setMsg("");
     try {
       await api.login(email.trim(), password);
+      // Sincroniza el contexto ANTES de navegar: si no, RequireAuth ve user=null
+      // y rebota a /login en bucle.
+      await refresh();
       router.push(next);
       router.refresh();
     } catch (err) {
@@ -140,7 +133,7 @@ function LoginForm() {
           Usa una cuenta demo o las credenciales que ya tengas.
         </p>
 
-        {checking ? (
+        {sessionLoading || user ? (
           <div className="stack mt-4" aria-hidden>
             <div className="skeleton" style={{ height: 62 }} />
             <div className="skeleton" style={{ height: 62 }} />
