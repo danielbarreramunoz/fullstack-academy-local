@@ -1,1 +1,0 @@
-../../.harness/.opencode/agents/verificar.md

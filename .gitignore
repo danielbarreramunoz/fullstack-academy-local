@@ -1,4 +1,5 @@
 .harness/
+.opencode/agents/
 node_modules/
 dist/
 .next/
